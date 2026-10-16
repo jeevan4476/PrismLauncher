@@ -596,7 +596,6 @@ QStringList MinecraftInstance::extraArguments()
 
     return list;
 }
-
 QStringList MinecraftInstance::javaArguments()
 {
     QStringList args;
@@ -662,7 +661,6 @@ QStringList MinecraftInstance::javaArguments()
 
     return args;
 }
-
 QString MinecraftInstance::getLauncher()
 {
     // use legacy launcher if the traits are set
@@ -774,7 +772,6 @@ QProcessEnvironment MinecraftInstance::createLaunchEnvironment()
 #endif
     return env;
 }
-
 QStringList MinecraftInstance::processMinecraftArgs(AuthSessionPtr session, MinecraftTarget::Ptr targetToJoin) const
 {
     auto profile = m_components->getProfile();
@@ -798,15 +795,24 @@ QStringList MinecraftInstance::processMinecraftArgs(AuthSessionPtr session, Mine
 
     QMap<QString, QString> tokenMapping = makeProfileVarMapping(profile);
 
-    // yggdrasil!
+    // Contextual Token Interception Layer
     if (session) {
-        // token_mapping["auth_username"] = session->username;
         tokenMapping["auth_session"] = session->session;
-        tokenMapping["auth_access_token"] = session->access_token;
-        tokenMapping["auth_player_name"] = session->player_name;
-        tokenMapping["auth_uuid"] = session->uuid;
         tokenMapping["user_properties"] = session->serializeUserProperties();
         tokenMapping["user_type"] = session->user_type;
+
+        // Force '0' for offline tokens using the precise variable casing of this codebase
+        if (session->access_token.isEmpty() || session->access_token == "offline" || session->access_token == "0") {
+            tokenMapping["auth_access_token"] = "0";
+            tokenMapping["auth_player_name"]  = !session->player_name.isEmpty() ? session->player_name : "Player";
+            tokenMapping["auth_uuid"]         = !session->uuid.isEmpty() ? session->uuid : "00000000000000000000000000000000";
+            tokenMapping["auth_session"]      = "token:0:" + tokenMapping["auth_uuid"];
+        } else {
+            tokenMapping["auth_access_token"] = session->access_token;
+            tokenMapping["auth_player_name"]  = session->player_name;
+            tokenMapping["auth_uuid"]         = session->uuid;
+            tokenMapping["auth_session"]      = session->session;
+        }
 
         if (session->launchMode == LaunchMode::Demo) {
             args << "--demo";
